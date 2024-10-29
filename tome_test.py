@@ -1,9 +1,17 @@
 import timm
 import tome
 from torchinfo import summary
+import torch
+torch.cuda.empty_cache()
+# for i in timm.list_models():
+#     print(i)
+# a
+
+
 
 # Load Model
 model_name = "vit_base_patch16_224"
+# model_name = "vit_base_patch32_224"
 model = timm.create_model(model_name, pretrained=True)
 
 # GPU setting

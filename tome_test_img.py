@@ -4,6 +4,7 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, random_split
+import matplotlib.pyplot as plt
 
 import timm
 import tome
@@ -11,14 +12,14 @@ from tqdm import tqdm
 from datetime import datetime
 import time
 import sys
-from utils import set_seed, write_config_log, write_result_log
+# from utils import set_seed, write_config_log, write_result_log
 import os
-import GPUtil
+
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 # CONFIG
 # Learning Options
 EPOCHS     = 10           # train how many epochs
-BATCH_SIZE = 64          # batch size for dataloader 
+BATCH_SIZE = 128          # batch size for dataloader 
 USE_ADAM   = False        # Adam or SGD optimizer
 LR         = 1e-3         # learning rate
 MILESTONES = [16, 32, 45] # reduce learning rate at 'milestones' epochs
@@ -33,8 +34,56 @@ class ModelConfig:
         self.epochs = epochs
         self.batch_size = batch_size
         self.learning_rate = learning_rate
-    
 
+def write_result_log(logfile_path, epoch, epoch_time, train_acc, val_acc, train_loss, val_loss, is_better):
+    ''' write experiment log file for result of each epoch to ./experiment/{exp_name}/log/result_log.txt '''
+    with open(logfile_path, 'a') as f:
+        f.write(f'[{epoch + 1}/{cfg.epochs}] {epoch_time:.2f} sec(s) Train Acc: {train_acc:.5f} | Val Acc: {val_acc:.5f} | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}')
+        if is_better:
+            f.write(' -> val best (acc)')
+        f.write('\n')
+
+def plot_learning_curve(logfile_dir, result_lists):
+    plt.figure()
+    plt.plot(result_lists['train_acc'])
+    plt.title('Train Accuracy History')
+    plt.ylabel('Train Accuracy')
+    plt.xlabel('Epoch')
+    # plt.legend(['Train accuracy'], loc='lower right')
+    # plt.show()
+    plt.savefig(os.path.join(logfile_dir, 'train_acc.jpg'))
+    plt.close()
+
+    plt.figure()
+    plt.plot(result_lists['train_loss'])
+    plt.title('Train Accuracy History')
+    plt.ylabel('Train Loss')
+    plt.xlabel('Epoch')
+    # plt.legend(['Train Loss'], loc='lower right')
+    # plt.show()
+    plt.savefig(os.path.join(logfile_dir, 'train_loss.jpg'))
+    plt.close()
+
+    plt.figure()
+    plt.plot(result_lists['val_acc'])
+    plt.title('Validation Accuracy History')
+    plt.ylabel('Validation Accuracy')
+    plt.xlabel('Epoch')
+    # plt.legend(['Valid accuracy'], loc='lower right')
+    # plt.show()
+    plt.savefig(os.path.join(logfile_dir, 'val_acc.jpg'))
+    plt.close()
+
+
+    plt.figure()
+    plt.plot(result_lists['val_loss'])
+    plt.title('Validation Loss History')
+    plt.ylabel('Valid Loss')
+    plt.xlabel('Epoch')
+    # plt.legend(['Valid Loss'], loc='lower right')
+    # plt.show()
+    plt.savefig(os.path.join(logfile_dir, 'val_loss.jpg'))
+    plt.close()
 
 def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, model_save_dir, logfile_dir):
     # model.train()  # 設置模型為訓練模式
@@ -51,24 +100,9 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
         for batch, data in enumerate(train_loader):
             sys.stdout.write(f'\r[{epoch + 1}/{epochs}] Train batch: {batch + 1} / {len(train_loader)}')
             sys.stdout.flush()
-            # gpus = GPUtil.getGPUs()
-            # gpu_info_list = []
-            # for gpu in gpus:
-            #     gpu_info_list.append({
-            #         "id": gpu.id,
-            #         "name": gpu.name,
-            #         "load": f"{gpu.load * 100}%",
-            #         "memory_total": f"{gpu.memoryTotal}MB",
-            #         "memory_used": f"{gpu.memoryUsed}MB",
-            #         "memory_free": f"{gpu.memoryFree}MB",
-            #         "temperature": f"{gpu.temperature} °C",
-            #         "uuid": gpu.uuid
-            #     })
-            # print(gpu_info_list)
             # Data loading.
             images, labels = data
             images, labels = images.to(device), labels.to(device) # (batch_size, 3, 32, 32), (batch_size)
-            # Forward pass. input: (batch_size, 3, 32, 32), output: (batch_size, 10)
             pred = model(images)
             # Calculate loss.
             loss = criterion(pred, labels)
@@ -131,21 +165,22 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
             torch.save(model.state_dict(), os.path.join(model_save_dir, 'model_best.pth'))
             best_acc = val_acc
 
-    def test_model(model, testloader):
-        model.eval()  
-        correct = 0
-        total = 0
-        with torch.no_grad():
-            for data in testloader:
-                images, labels = data
-                images, labels = images.to(device), labels.to(device) # (batch_size, 3, 32, 32), (batch_size)
-                # Forward pass. input: (batch_size, 3, 32, 32), output: (batch_size, 10)
-                outputs = model(images)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+def test_model(model, testloader):
+    model.eval()  
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for data in testloader:
+            images, labels = data
+            images, labels = images.to(device), labels.to(device) # (batch_size, 3, 32, 32), (batch_size)
+            # Forward pass. input: (batch_size, 3, 32, 32), output: (batch_size, 10)
+            outputs = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
 
-        print(f'acc: {100 * correct / total}%')
+    print(f'acc: {100 * correct / total}%')
+
 
 # 基準測試 (Throughput)
 def benchmark_with_dataset(
@@ -293,7 +328,7 @@ if __name__ == '__main__':
     
     # TRAIN
     train_model(model, train_loader, val_loader, optimizer, criterion, cfg.epochs, model_save_dir, logfile_dir)
-
+    test_model(model, test_loader)
 
     # print("benchmarking")
     # throughput, accuracy = benchmark_with_dataset(model, dataset_loader, device=device, runs=50, verbose=True)
