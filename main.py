@@ -14,12 +14,14 @@ import time
 import sys
 # from utils import set_seed, write_config_log, write_result_log
 import os
+import wandb
+
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 # CONFIG
 # Learning Options
-EPOCHS     = 10           # train how many epochs
-BATCH_SIZE = 128          # batch size for dataloader 
+EPOCHS     = 50           # train how many epochs
+BATCH_SIZE = 128          # batch size for dataloader (256太大了)
 USE_ADAM   = False        # Adam or SGD optimizer
 LR         = 1e-3         # learning rate
 MILESTONES = [16, 32, 45] # reduce learning rate at 'milestones' epochs
@@ -27,9 +29,10 @@ MILESTONES = [16, 32, 45] # reduce learning rate at 'milestones' epochs
 # Param
 
 class ModelConfig:
-    def __init__(self, exp_name: str, model_type: str, runs: int, epochs: int, batch_size: int, learning_rate: float):
+    def __init__(self, exp_name: str, model_type: str, model_name: str, runs: int, epochs: int, batch_size: int, learning_rate: float):
         self.exp_name = exp_name
         self.model_type = model_type
+        self.model_name = model_name
         self.runs = runs
         self.epochs = epochs
         self.batch_size = batch_size
@@ -49,8 +52,8 @@ def plot_learning_curve(logfile_dir, result_lists):
     plt.title('Train Accuracy History')
     plt.ylabel('Train Accuracy')
     plt.xlabel('Epoch')
-    # plt.legend(['Train accuracy'], loc='lower right')
-    # plt.show()
+    plt.legend(['Train accuracy'], loc='lower right')
+    plt.show()
     plt.savefig(os.path.join(logfile_dir, 'train_acc.jpg'))
     plt.close()
 
@@ -59,8 +62,8 @@ def plot_learning_curve(logfile_dir, result_lists):
     plt.title('Train Accuracy History')
     plt.ylabel('Train Loss')
     plt.xlabel('Epoch')
-    # plt.legend(['Train Loss'], loc='lower right')
-    # plt.show()
+    plt.legend(['Train Loss'], loc='lower right')
+    plt.show()
     plt.savefig(os.path.join(logfile_dir, 'train_loss.jpg'))
     plt.close()
 
@@ -69,8 +72,8 @@ def plot_learning_curve(logfile_dir, result_lists):
     plt.title('Validation Accuracy History')
     plt.ylabel('Validation Accuracy')
     plt.xlabel('Epoch')
-    # plt.legend(['Valid accuracy'], loc='lower right')
-    # plt.show()
+    plt.legend(['Valid accuracy'], loc='lower right')
+    plt.show()
     plt.savefig(os.path.join(logfile_dir, 'val_acc.jpg'))
     plt.close()
 
@@ -80,8 +83,8 @@ def plot_learning_curve(logfile_dir, result_lists):
     plt.title('Validation Loss History')
     plt.ylabel('Valid Loss')
     plt.xlabel('Epoch')
-    # plt.legend(['Valid Loss'], loc='lower right')
-    # plt.show()
+    plt.legend(['Valid Loss'], loc='lower right')
+    plt.show()
     plt.savefig(os.path.join(logfile_dir, 'val_loss.jpg'))
     plt.close()
 
@@ -108,7 +111,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
             loss = criterion(pred, labels)
             # Backprop. (update model parameters)
             optimizer.zero_grad()
-            loss.backward()
+            # loss.backward()
             optimizer.step()
             # Evaluate.
             train_correct += torch.sum(torch.argmax(pred, dim=1) == labels)
@@ -119,6 +122,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
         train_loss /= len(train_loader)
         train_acc_list.append(train_acc)
         train_loss_list.append(train_loss)
+
         print()
         print(f'[{epoch + 1}/{epochs}] {train_time:.2f} sec(s) Train Acc: {train_acc:.5f} | Train Loss: {train_loss:.5f}')
         ##### VALIDATION #####
@@ -148,6 +152,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
         val_loss /= len(val_loader)
         val_acc_list.append(val_acc)
         val_loss_list.append(val_loss)
+
         print()
         print(f'[{epoch + 1}/{epochs}] {val_time:.2f} sec(s) Val Acc: {val_acc:.5f} | Val Loss: {val_loss:.5f}')
         
@@ -158,13 +163,30 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
         is_better = val_acc >= best_acc
         epoch_time = train_time + val_time
         write_result_log(os.path.join(logfile_dir, 'result_log.txt'), epoch, epoch_time, train_acc, val_acc, train_loss, val_loss, is_better)
-
         ##### SAVE THE BEST MODEL #####
         if is_better:
             print(f'[{epoch + 1}/{epochs}] Save best model to {model_save_dir} ...')
             torch.save(model.state_dict(), os.path.join(model_save_dir, 'model_best.pth'))
             best_acc = val_acc
+        
+        wandb.log({
+            "epoch": epoch,
+            "train_acc": train_acc,
+            "train_loss": train_loss,
+            "val_acc": val_acc,
+            "val_loss": val_loss
+        })
 
+        ##### PLOT LEARNING CURVE #####
+        ##### TODO: check plot_learning_curve() in this file #####
+        current_result_lists = {
+            'train_acc': train_acc_list,
+            'train_loss': train_loss_list,
+            'val_acc': val_acc_list,
+            'val_loss': val_loss_list
+        }
+        
+        # plot_learning_curve(logfile_dir, current_result_lists)
 def test_model(model, testloader):
     model.eval()  
     correct = 0
@@ -184,14 +206,14 @@ def test_model(model, testloader):
 
 # 基準測試 (Throughput)
 def benchmark_with_dataset(
-    model: torch.nn.Module,
-    dataset_loader: DataLoader,
-    device: torch.device = 0,
-    runs: int = 40,
-    throw_out: float = 0.25,
-    use_fp16: bool = False,
-    verbose: bool = False,
-) -> float:
+        model: torch.nn.Module,
+        dataset_loader: DataLoader,
+        device: torch.device = 0,
+        runs: int = 40,
+        throw_out: float = 0.25,
+        use_fp16: bool = False,
+        verbose: bool = False,
+    ) -> float:
     """
     Benchmark the given model with a real dataset loader (e.g. CIFAR-10), calculating throughput and accuracy.
 
@@ -261,46 +283,76 @@ def benchmark_with_dataset(
 
     return throughput, accuracy
 
+def write_config(cfg: ModelConfig, config_file_path: str):
+    with open(config_file_path, 'w') as f:
+        f.write(f"Experiment Name: {cfg.exp_name}\n")
+        f.write(f"Model Type: {cfg.model_type}\n")
+        f.write(f"Model Name: {cfg.model_name}\n")
+        f.write(f"Number of Runs: {cfg.runs}\n")
+        f.write(f"Epochs: {cfg.epochs}\n")
+        f.write(f"Batch Size: {cfg.batch_size}\n")
+        f.write(f"Learning Rate: {cfg.learning_rate}\n")
+
+    print(f"Configuration saved to {config_file_path}")
+
+
+
+
 if __name__ == '__main__':
-    cfg = ModelConfig(
-        exp_name = "vit_pre",
-        model_type = "vit",
-        runs = 50,
-        epochs = EPOCHS,
-        batch_size = BATCH_SIZE,
-        learning_rate = LR
+    wandb.init(
+        project="deit",
+        config={
+            "learning_rate": 1e-3,
+            "epoch": 50
+        },
+        name="DeiT",
     )
+    cfg = ModelConfig(
+        exp_name = "augreg",
+        model_type = "vit",
+        model_name = "vit_small_patch32_224.augreg_in21k_ft_in1k",
+        runs = 50,
+        epochs = 300,
+        batch_size = 64,
+        learning_rate = 1e-3
+    )
+
     # Experiment name
     exp_name = cfg.model_type + datetime.now().strftime('_%Y_%m_%d_%H_%M_%S') + '_' + cfg.exp_name
+
 
     # Write log file for config
     logfile_dir = os.path.join('./experiment', exp_name, 'log')
     os.makedirs(logfile_dir, exist_ok=True)
+    # Write config
+    config_path = os.path.join('./experiment', exp_name, 'config.txt')
+    write_config(cfg, config_path)
     # write_config_log(os.path.join(logfile_dir, 'config_log.txt'))
     model_save_dir = os.path.join('./experiment', exp_name, 'model')
     os.makedirs(model_save_dir, exist_ok=True)
 
     # MODEL
     # (ViT backbone)
-    model_name = "vit_base_patch32_224"  # 也可以使用 "vit_base_patch32_224"
-    model = timm.create_model(model_name, pretrained=True, num_classes=10)  
+    
+    model = timm.create_model(cfg.model_name, pretrained=True, num_classes=10)  
 
     # GPU setting
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
-
+    input_size = model.default_cfg["input_size"]
+    print(input_size[1:])
 
     # DATALOADER
     # Set CIFAR-10 img from to 224x224
     transform_train = transforms.Compose([
-        transforms.Resize((224, 224)),  
+        transforms.Resize(input_size[1:]),  
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
     ])
 
     transform_test = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize(input_size[1:]),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
     ])
@@ -308,8 +360,8 @@ if __name__ == '__main__':
     # Load CIFAR-10
     trainset_full = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
 
-    # 80% training, 20% val
-    train_size = int(0.6 * len(trainset_full))
+    # 70% training, 30% val
+    train_size = int(0.7 * len(trainset_full))
     val_size = len(trainset_full) - train_size
     trainset, valset = random_split(trainset_full, [train_size, val_size])
 
@@ -330,9 +382,13 @@ if __name__ == '__main__':
     train_model(model, train_loader, val_loader, optimizer, criterion, cfg.epochs, model_save_dir, logfile_dir)
     test_model(model, test_loader)
 
+    # # exp_name = 'vit_2024_10_29_12_09_37_vit_pre'
+    # best_model_path = os.path.join('./experiment', exp_name, 'model', 'model_best.pth')
+    # print( best_model_path)
+    # model.load_state_dict(torch.load(best_model_path, map_location=device, weights_only=True))
+    # model.eval()
     # print("benchmarking")
-    # throughput, accuracy = benchmark_with_dataset(model, dataset_loader, device=device, runs=50, verbose=True)
-
+    # throughput, accuracy = benchmark_with_dataset(model, test_loader, device=device, runs=50, verbose=True)
     # print(f"Benchmark Results -> Throughput: {throughput:.2f} im/s, Accuracy: {accuracy:.2f}%")
     
     

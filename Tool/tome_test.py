@@ -3,10 +3,6 @@ import tome
 from torchinfo import summary
 import torch
 torch.cuda.empty_cache()
-# for i in timm.list_models():
-#     print(i)
-# a
-
 
 
 # Load Model

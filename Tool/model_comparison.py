@@ -10,6 +10,7 @@ cnn_model_list = ["mobilenetv3_large_100.ra_in1k",
                   "mixnet_s.ft_in1k"]
 cnn_throughput = []
 vit_model_list = [ "deit_tiny_distilled_patch16_224.fb_in1k",
+                  "vit_base_patch16_224.orig_in21k_ft_in1k",
                     "cait_xxs24_224.fb_dist_in1k", # https://huggingface.co/timm/cait_xxs24_224.fb_dist_in1k
                     # "resmlp_12_224.fb_in1k", # https://huggingface.co/timm/resmlp_12_224.fb_in1k
                     "vit_small_patch32_224.augreg_in21k_ft_in1k", # https://huggingface.co/timm/vit_small_patch32_224.augreg_in21k_ft_in1k
@@ -22,23 +23,6 @@ vit_throughput = []
 vit_tome_throughput = []
 vit_tome_improvement = []
 token_reduce_amount = 16
-
-# for model_name in cnn_model_list:
-#     # model_name = "tf_mobilenetv3_large_075"
-#     print(model_name)
-#     model = timm.create_model(model_name, pretrained=True)
-#     summary(model, input_size=(batch_size, 3, 224, 224), verbose=0)
-#     input_size = model.default_cfg["input_size"]
-#     baseline_throughput = tome.utils.benchmark(
-#         model,
-#         device=device,
-#         verbose=True,
-#         runs=runs,
-#         batch_size=batch_size,
-#         input_size=input_size
-#     )
-#     print()
-#     cnn_throughput.append(baseline_throughput)
 
 print("ViT \n")
 for model_name in vit_model_list:

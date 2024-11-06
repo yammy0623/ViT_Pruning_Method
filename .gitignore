@@ -3,6 +3,8 @@ __pycache__/
 data/
 experiment/
 checkpoint/
+wandb/
+*.pth
 
 *.py[cod]
 *$py.class
