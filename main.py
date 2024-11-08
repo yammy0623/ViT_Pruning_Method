@@ -15,6 +15,7 @@ import sys
 # from utils import set_seed, write_config_log, write_result_log
 import os
 import wandb
+from torchinfo import summary
 
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
@@ -299,24 +300,24 @@ def write_config(cfg: ModelConfig, config_file_path: str):
 
 
 if __name__ == '__main__':
-    wandb.init(
-        project="deit",
-        config={
-            "learning_rate": 1e-3,
-            "epoch": 50
-        },
-        name="DeiT",
-    )
+
     cfg = ModelConfig(
-        exp_name = "augreg",
+        exp_name = "vit",
         model_type = "vit",
-        model_name = "vit_small_patch32_224.augreg_in21k_ft_in1k",
+        model_name = "vit_small_patch32_224",
         runs = 50,
         epochs = 300,
         batch_size = 64,
         learning_rate = 1e-3
     )
-
+    wandb.init(
+        project=cfg.exp_name,
+        config={
+            "learning_rate": cfg.learning_rate,
+            "epoch": cfg.epochs
+        },
+        name=cfg.model_name,
+    )
     # Experiment name
     exp_name = cfg.model_type + datetime.now().strftime('_%Y_%m_%d_%H_%M_%S') + '_' + cfg.exp_name
 
@@ -333,8 +334,9 @@ if __name__ == '__main__':
 
     # MODEL
     # (ViT backbone)
+    model = timm.create_model(cfg.model_name, pretrained=True, num_classes=10)
+    summary(model, input_size=(1, 3, 224, 224))
     
-    model = timm.create_model(cfg.model_name, pretrained=True, num_classes=10)  
 
     # GPU setting
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

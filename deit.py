@@ -15,7 +15,7 @@ import sys
 # from utils import set_seed, write_config_log, write_result_log
 import os
 import wandb
-
+from torchsummary import summary
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 # CONFIG
@@ -322,7 +322,7 @@ if __name__ == '__main__':
     # (ViT backbone)
     
     model = timm.create_model(cfg.model_name, pretrained=True, num_classes=10)  
-
+    summary(model, model.default_cfg["input_size"])
     # GPU setting
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
