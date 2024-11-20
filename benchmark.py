@@ -18,7 +18,7 @@ class ModelConfig:
         self.batch_size = batch_size
         self.learning_rate = learning_rate
 
-        
+
 def benchmark_with_dataset(
         model: torch.nn.Module,
         dataset_loader: DataLoader,
@@ -111,8 +111,6 @@ def main(file_folder):
 
 
     best_model_path = file_folder + "/model/model_best.pth"
-
-    isToMe = True
     # Load pretrain model 
     model_name = cfg.model_name
     model = timm.create_model(model_name, pretrained=False, num_classes=10)  
@@ -142,29 +140,31 @@ def main(file_folder):
     throughput, accuracy = benchmark_with_dataset(model, test_loader, device=device, runs=50, verbose=True)
     print(f"Benchmark Results -> Throughput: {throughput:.2f} im/s, Accuracy: {accuracy:.2f}%")
     
-    if isToMe:
-        print("Apply ToMe")
-        tome.patch.timm(model)
-        throughput_tome, accuracy_tome = benchmark_with_dataset(model, test_loader, device=device, runs=50, verbose=True)
-        print(f"Benchmark Results -> Throughput: {throughput:.2f} im/s, Accuracy: {accuracy:.2f}%")
+
     
     output_file = file_folder + "/benchmark.txt"
     with open(output_file, "w") as file:
         file.write(f"Original\n")
         file.write(f"Throughput: {throughput:.2f} im/s\n")
         file.write(f"Accuracy: {accuracy:.2f}%\n\n")
-        file.write(f"Apply ToMe\n")
-        file.write(f"Throughput: {throughput_tome:.2f} im/s\n")
-        file.write(f"Accuracy: {accuracy_tome:.2f}%\n\n")
+
+        if cfg.exp_name != "CNN_based":
+            print("Apply ToMe")
+            tome.patch.timm(model)
+            throughput_tome, accuracy_tome = benchmark_with_dataset(model, test_loader, device=device, runs=50, verbose=True)
+            print(f"Benchmark Results -> Throughput: {throughput:.2f} im/s, Accuracy: {accuracy:.2f}%")
+            file.write(f"Apply ToMe\n")
+            file.write(f"Throughput: {throughput_tome:.2f} im/s\n")
+            file.write(f"Accuracy: {accuracy_tome:.2f}%\n\n")
 
 if __name__ == '__main__':
-    experiment_dir = './experiment'
-    folders = parse_experiment_folders(experiment_dir)
+    # experiment_dir = './experiment'
+    # folders = parse_experiment_folders(experiment_dir)
 
-    for folder in folders:
-        print(folder)
-        file_folder = os.path.join(experiment_dir, folder)
-        main(file_folder)
+    # for folder in folders:
+    #     print(folder)
+    #     file_folder = os.path.join(experiment_dir, folder)
+    #     main(file_folder)
 
-    # file_folder = "./experiment/deit3_2024_11_14_09_50_09_deit3"
-    # main(file_folder)
+    file_folder = "./experiment/deit3_2024_11_14_09_50_09_deit3"
+    main(file_folder)

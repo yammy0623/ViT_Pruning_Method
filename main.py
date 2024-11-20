@@ -5,6 +5,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, random_split
 import matplotlib.pyplot as plt
+import numpy as np
 
 import timm
 import tome
@@ -16,7 +17,7 @@ import sys
 import os
 import wandb
 from torchinfo import summary
-
+import yaml
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 # CONFIG
@@ -48,53 +49,65 @@ def write_result_log(logfile_path, epoch, epoch_time, train_acc, val_acc, train_
         f.write('\n')
 
 def plot_learning_curve(logfile_dir, result_lists):
+    # 確保資料轉換為 CPU 再繪圖
+    train_acc = [x.cpu().numpy() if isinstance(x, torch.Tensor) else x for x in result_lists['train_acc']]
+    train_loss = [x.cpu().numpy() if isinstance(x, torch.Tensor) else x for x in result_lists['train_loss']]
+    val_acc = [x.cpu().numpy() if isinstance(x, torch.Tensor) else x for x in result_lists['val_acc']]
+    val_loss = [x.cpu().numpy() if isinstance(x, torch.Tensor) else x for x in result_lists['val_loss']]
+
+    
     plt.figure()
-    plt.plot(result_lists['train_acc'])
+    plt.plot(train_acc)
     plt.title('Train Accuracy History')
     plt.ylabel('Train Accuracy')
     plt.xlabel('Epoch')
     plt.legend(['Train accuracy'], loc='lower right')
-    plt.show()
+    # plt.show()
     plt.savefig(os.path.join(logfile_dir, 'train_acc.jpg'))
     plt.close()
 
     plt.figure()
-    plt.plot(result_lists['train_loss'])
-    plt.title('Train Accuracy History')
+    plt.plot(train_loss)
+    plt.title('Train Loss History')
     plt.ylabel('Train Loss')
     plt.xlabel('Epoch')
     plt.legend(['Train Loss'], loc='lower right')
-    plt.show()
+    # plt.show()
     plt.savefig(os.path.join(logfile_dir, 'train_loss.jpg'))
     plt.close()
 
     plt.figure()
-    plt.plot(result_lists['val_acc'])
+    plt.plot(val_acc)
     plt.title('Validation Accuracy History')
     plt.ylabel('Validation Accuracy')
     plt.xlabel('Epoch')
     plt.legend(['Valid accuracy'], loc='lower right')
-    plt.show()
+    # plt.show()
     plt.savefig(os.path.join(logfile_dir, 'val_acc.jpg'))
     plt.close()
 
-
     plt.figure()
-    plt.plot(result_lists['val_loss'])
+    plt.plot(val_loss)
     plt.title('Validation Loss History')
     plt.ylabel('Valid Loss')
     plt.xlabel('Epoch')
     plt.legend(['Valid Loss'], loc='lower right')
-    plt.show()
+    # plt.show()
     plt.savefig(os.path.join(logfile_dir, 'val_loss.jpg'))
     plt.close()
 
-def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, model_save_dir, logfile_dir):
+
+def train_model(device, model, train_loader, val_loader, optimizer, criterion, epochs, model_save_dir, logfile_dir):
     # model.train()  # 設置模型為訓練模式
     train_loss_list, val_loss_list = [], []
     train_acc_list, val_acc_list = [], []
     best_acc = 0.0
 
+    # for early stopping
+    best_loss = np.inf
+    best_epoch = 0
+    counter = 0
+    patience = 50
     for epoch in range(epochs):
         ##### TRAINING #####
         train_start_time = time.time()
@@ -112,7 +125,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
             loss = criterion(pred, labels)
             # Backprop. (update model parameters)
             optimizer.zero_grad()
-            # loss.backward()
+            loss.backward()
             optimizer.step()
             # Evaluate.
             train_correct += torch.sum(torch.argmax(pred, dim=1) == labels)
@@ -158,7 +171,21 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
         print(f'[{epoch + 1}/{epochs}] {val_time:.2f} sec(s) Val Acc: {val_acc:.5f} | Val Loss: {val_loss:.5f}')
         
         # Scheduler step
-        scheduler.step()
+        # scheduler.step()
+        wandb.log({
+            "epoch": epoch,
+            "train_acc": train_acc,
+            "train_loss": train_loss,
+            "val_acc": val_acc,
+            "val_loss": val_loss
+        })
+
+        current_result_lists = {
+            'train_acc': train_acc_list,
+            'train_loss': train_loss_list,
+            'val_acc': val_acc_list,
+            'val_loss': val_loss_list
+        }
 
         ##### WRITE LOG #####
         is_better = val_acc >= best_acc
@@ -169,26 +196,16 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs, m
             print(f'[{epoch + 1}/{epochs}] Save best model to {model_save_dir} ...')
             torch.save(model.state_dict(), os.path.join(model_save_dir, 'model_best.pth'))
             best_acc = val_acc
-        
-        wandb.log({
-            "epoch": epoch,
-            "train_acc": train_acc,
-            "train_loss": train_loss,
-            "val_acc": val_acc,
-            "val_loss": val_loss
-        })
+            counter = 0
+        else:
+            counter += 1
+            if counter >= patience:
+                print(f"Early stopping at epoch {epoch}. Best validation loss: {best_loss:.4f}.")
+                break
+           
+    plot_learning_curve(logfile_dir, current_result_lists)
 
-        ##### PLOT LEARNING CURVE #####
-        ##### TODO: check plot_learning_curve() in this file #####
-        current_result_lists = {
-            'train_acc': train_acc_list,
-            'train_loss': train_loss_list,
-            'val_acc': val_acc_list,
-            'val_loss': val_loss_list
-        }
-        
-        # plot_learning_curve(logfile_dir, current_result_lists)
-def test_model(model, testloader):
+def test_model(device, model, testloader):
     model.eval()  
     correct = 0
     total = 0
@@ -204,112 +221,24 @@ def test_model(model, testloader):
 
     print(f'acc: {100 * correct / total}%')
 
-
-# 基準測試 (Throughput)
-def benchmark_with_dataset(
-        model: torch.nn.Module,
-        dataset_loader: DataLoader,
-        device: torch.device = 0,
-        runs: int = 40,
-        throw_out: float = 0.25,
-        use_fp16: bool = False,
-        verbose: bool = False,
-    ) -> float:
-    """
-    Benchmark the given model with a real dataset loader (e.g. CIFAR-10), calculating throughput and accuracy.
-
-    Args:
-     - model: the module to benchmark
-     - dataset_loader: the DataLoader for the dataset (e.g. CIFAR-10)
-     - device: the device to use for benchmarking
-     - runs: the number of total runs to do
-     - throw_out: the percentage of runs to throw out at the start of testing
-     - use_fp16: whether or not to benchmark with float16 and autocast
-     - verbose: whether or not to use tqdm to print progress / print throughput at end
-
-    Returns:
-     - throughput measured in images / second
-     - accuracy of the model on the dataset
-    """
-    if not isinstance(device, torch.device):
-        device = torch.device(device)
-    is_cuda = torch.device(device).type == "cuda"
-
-    model = model.eval().to(device)
-    correct = 0
-    total = 0
-    warm_up = int(runs * throw_out)
-    total_images = 0
-    start = time.time()
-
-    with torch.autocast(device.type, enabled=use_fp16):
-        with torch.no_grad():
-            for i, (inputs, labels) in enumerate(tqdm(dataset_loader, disable=not verbose, desc="Benchmarking")):
-                
-                if i == warm_up:
-                    if is_cuda:
-                        torch.cuda.synchronize()
-                    total_images = 0
-                    correct = 0
-                    total = 0
-                    start = time.time()
-
-                inputs, labels = inputs.to(device), labels.to(device)
-                if use_fp16:
-                    inputs = inputs.half()
-
-                outputs = model(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-
-                total_images += inputs.size(0)
-
-                if i >= runs:  # Limit the number of runs
-                    break
-
-    if is_cuda:
-        torch.cuda.synchronize()
-
-    end = time.time()
-    elapsed = end - start
-
-    throughput = total_images / elapsed
-    accuracy = 100 * correct / total
-
-    if verbose:
-        print(f"Throughput: {throughput:.2f} im/s")
-        print(f"Accuracy: {accuracy:.2f}%")
-
-    return throughput, accuracy
-
 def write_config(cfg: ModelConfig, config_file_path: str):
+    config_dict = {
+        "Experiment Name": cfg.exp_name,
+        "Model Type": cfg.model_type,
+        "Model Name": cfg.model_name,
+        "Number of Runs": cfg.runs,
+        "Epochs": cfg.epochs,
+        "Batch Size": cfg.batch_size,
+        "Learning Rate": cfg.learning_rate
+    }
     with open(config_file_path, 'w') as f:
-        f.write(f"Experiment Name: {cfg.exp_name}\n")
-        f.write(f"Model Type: {cfg.model_type}\n")
-        f.write(f"Model Name: {cfg.model_name}\n")
-        f.write(f"Number of Runs: {cfg.runs}\n")
-        f.write(f"Epochs: {cfg.epochs}\n")
-        f.write(f"Batch Size: {cfg.batch_size}\n")
-        f.write(f"Learning Rate: {cfg.learning_rate}\n")
+        yaml.dump(config_dict, f)
 
     print(f"Configuration saved to {config_file_path}")
 
 
-
-
-if __name__ == '__main__':
-
-    cfg = ModelConfig(
-        exp_name = "vit",
-        model_type = "vit",
-        model_name = "vit_small_patch32_224",
-        runs = 50,
-        epochs = 300,
-        batch_size = 64,
-        learning_rate = 1e-3
-    )
+def main(cfg):
+    print(f"Running experiment {cfg.exp_name} with model {cfg.model_name}")
     wandb.init(
         project=cfg.exp_name,
         config={
@@ -326,7 +255,7 @@ if __name__ == '__main__':
     logfile_dir = os.path.join('./experiment', exp_name, 'log')
     os.makedirs(logfile_dir, exist_ok=True)
     # Write config
-    config_path = os.path.join('./experiment', exp_name, 'config.txt')
+    config_path = os.path.join('./experiment', exp_name, 'config.ysaml')
     write_config(cfg, config_path)
     # write_config_log(os.path.join(logfile_dir, 'config_log.txt'))
     model_save_dir = os.path.join('./experiment', exp_name, 'model')
@@ -335,7 +264,7 @@ if __name__ == '__main__':
     # MODEL
     # (ViT backbone)
     model = timm.create_model(cfg.model_name, pretrained=True, num_classes=10)
-    summary(model, input_size=(1, 3, 224, 224))
+    # summary(model, input_size=(1, 3, 224, 224))
     
 
     # GPU setting
@@ -348,9 +277,10 @@ if __name__ == '__main__':
     # Set CIFAR-10 img from to 224x224
     transform_train = transforms.Compose([
         transforms.Resize(input_size[1:]),  
-        transforms.RandomHorizontalFlip(),
+        # transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
+
     ])
 
     transform_test = transforms.Compose([
@@ -378,20 +308,65 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
     milestones = [16, 32, 45]
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.1)
+    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.1)
+    
     
     # TRAIN
-    train_model(model, train_loader, val_loader, optimizer, criterion, cfg.epochs, model_save_dir, logfile_dir)
-    test_model(model, test_loader)
+    train_model(device, model, train_loader, val_loader, optimizer, criterion, cfg.epochs, model_save_dir, logfile_dir)
+    test_model(device, model, test_loader)
+    wandb.finish()
+    
 
-    # # exp_name = 'vit_2024_10_29_12_09_37_vit_pre'
-    # best_model_path = os.path.join('./experiment', exp_name, 'model', 'model_best.pth')
-    # print( best_model_path)
-    # model.load_state_dict(torch.load(best_model_path, map_location=device, weights_only=True))
-    # model.eval()
-    # print("benchmarking")
-    # throughput, accuracy = benchmark_with_dataset(model, test_loader, device=device, runs=50, verbose=True)
-    # print(f"Benchmark Results -> Throughput: {throughput:.2f} im/s, Accuracy: {accuracy:.2f}%")
-    
-    
-    
+
+if __name__ == '__main__':
+    with open("config.yaml", "r") as file:
+        configs = yaml.safe_load(file)
+
+    for model_cfg in configs["models"]:
+        cfg = ModelConfig(**model_cfg)
+        main(cfg)
+
+
+    # cfg = ModelConfig(
+    #     exp_name = "cait",
+    #     model_type = "cait",
+    #     model_name = "cait_xxs24_224.fb_dist_in1k",
+    #     runs = 50,
+    #     epochs = 200,
+    #     batch_size = 32,
+    #     learning_rate = 1e-4
+    # )
+    # main(cfg)
+
+    # cfg = ModelConfig(
+    #     exp_name = "augreg",
+    #     model_type = "augreg",
+    #     model_name = "vit_small_patch32_224.augreg_in21k_ft_in1k",
+    #     runs = 50,
+    #     epochs = 200,
+    #     batch_size = 64,
+    #     learning_rate = 1e-4
+    # )
+    # main(cfg)
+
+    # cfg = ModelConfig(
+    #     exp_name = "deit3",
+    #     model_type = "deit3",
+    #     model_name = "deit3_small_patch16_384.fb_in22k_ft_in1k",
+    #     runs = 50,
+    #     epochs = 200,
+    #     batch_size = 32,
+    #     learning_rate = 1e-4
+    # )
+    # main(cfg)
+
+    # cfg = ModelConfig(
+    #     exp_name = "deit3",
+    #     model_type = "deit3",
+    #     model_name = "deit3_small_patch16_384.fb_in22k_ft_in1k",
+    #     runs = 50,
+    #     epochs = 200,
+    #     batch_size = 32,
+    #     learning_rate = 1e-4
+    # )
+    # main(cfg)
