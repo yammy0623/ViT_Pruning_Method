@@ -1,5 +1,11 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+data/
+experiment/
+checkpoint/
+wandb/
+*.pth
+
 *.py[cod]
 *$py.class
 
