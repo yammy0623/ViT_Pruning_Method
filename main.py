@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
+from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, random_split
 import matplotlib.pyplot as plt
 import numpy as np
@@ -359,14 +360,24 @@ def main(cfg):
     )
 
     # Load CIFAR-10
-    trainset_full = torchvision.datasets.CIFAR10(
-        root="./data", train=True, download=True, transform=transform_train
-    )
+    # trainset_full = torchvision.datasets.CIFAR10(
+    #     root="./data", train=True, download=True, transform=transform_train
+    # )
+    # train_size = int(0.7 * len(trainset_full))
+    # val_size = len(trainset_full) - train_size
+    # trainset, valset = random_split(trainset_full, [train_size, val_size])
+
+    # testset = torchvision.datasets.CIFAR10(
+    #     root="./data", train=False, download=True, transform=transform_test
+    # )
+
+    # Load ImageNet
+    data_dir = "/data/imagenet"
+    trainset = datasets.ImageNet(root=f"{data_dir}/train", transform=transform_train)
+    valset = datasets.ImageNet(root=f"{data_dir}/val", transform=transform_train)
+    testset = datasets.ImageFolder(root=f"{data_dir}/test", transform=transform_test)
 
     # 70% training, 30% val
-    train_size = int(0.7 * len(trainset_full))
-    val_size = len(trainset_full) - train_size
-    trainset, valset = random_split(trainset_full, [train_size, val_size])
 
     # DataLoader
     train_loader = DataLoader(
@@ -375,9 +386,7 @@ def main(cfg):
     val_loader = DataLoader(
         valset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
     )
-    testset = torchvision.datasets.CIFAR10(
-        root="./data", train=False, download=True, transform=transform_test
-    )
+
     test_loader = DataLoader(
         testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
     )
