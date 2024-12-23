@@ -130,7 +130,7 @@ def main(file_folder):
     # Load pretrain model
     model_name = cfg.model_name
     model = timm.create_model(model_name, pretrained=False, num_classes=10)
-
+    model.r = 16
     # Based on pretrained model
     input_size = model.default_cfg["input_size"]
     print(input_size[1:])
@@ -176,7 +176,7 @@ def main(file_folder):
     )
 
     output_file = file_folder + "/benchmark.txt"
-    with open(output_file, "w") as file:
+    with open(output_file, "a") as file:
         file.write(f"Original\n")
         file.write(f"Throughput: {throughput:.2f} im/s\n")
         file.write(f"Accuracy: {accuracy:.2f}%\n\n")
@@ -191,6 +191,7 @@ def main(file_folder):
                 f"Benchmark Results -> Throughput: {throughput_tome:.2f} im/s, Accuracy: {accuracy_tome:.2f}%"
             )
             file.write(f"Apply ToMe\n")
+            file.write(f"model.r: {model.r}\n")
             file.write(f"Throughput: {throughput_tome:.2f} im/s\n")
             file.write(f"Accuracy: {accuracy_tome:.2f}%\n\n")
 

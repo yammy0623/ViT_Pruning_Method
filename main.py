@@ -348,6 +348,7 @@ def main(cfg):
 
     # GPU setting
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(device)
     model.to(device)
     input_size = model.default_cfg["input_size"]
     print(input_size[1:])

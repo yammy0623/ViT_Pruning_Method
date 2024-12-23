@@ -52,7 +52,7 @@ models:
     model_name: "deit3_small_patch16_224.fb_in22k_ft_in1k"
     runs: 50
     epochs: 200
-    batch_size: 32
+    batch_size: 64
     learning_rate: 0.0001
 
   - exp_name: "ViT_ImageNet"
