@@ -8,8 +8,6 @@ import tome
 from tqdm import tqdm
 import time
 import yaml
-import os
-
 
 class ModelConfig:
     def __init__(
@@ -95,10 +93,6 @@ def benchmark_with_dataset(
         print(f"Accuracy: {accuracy:.2f}%")
 
     return throughput, accuracy
-
-
-
-
 
 def parse_experiment_folders(experiment_dir):
     if not os.path.exists(experiment_dir):
@@ -193,16 +187,3 @@ def main(file_folder):
             file.write(f"Apply ToMe\n")
             file.write(f"Throughput: {throughput_tome:.2f} im/s\n")
             file.write(f"Accuracy: {accuracy_tome:.2f}%\n\n")
-
-
-if __name__ == "__main__":
-    # experiment_dir = './experiment/ImageNet'
-    # folders = parse_experiment_folders(experiment_dir)
-
-    # for folder in folders:
-    #     print(folder)
-    #     file_folder = os.path.join(experiment_dir, folder)
-    #     main(file_folder)
-
-    file_folder = "./experiment/ImageNet/deit3_2024_12_18_11_11_55_ViT_ImageNet"
-    main(file_folder)
