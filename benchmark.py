@@ -120,17 +120,27 @@ def main(file_folder):
         "Learning Rate": "learning_rate",
     }
 
+    isImageNet = False
+    isCIFAR10 = False
+
     with open(file_folder + "/config.yaml", "r") as file:
         raw_config = yaml.safe_load(file)
     mapped_config = {key_mapping[k]: v for k, v in raw_config.items()}
     cfg = ModelConfig(**mapped_config)
     print(cfg)
 
+    if "ImageNet" in cfg.exp_name:
+        print("ImageNet")
+        isImageNet = True
+    elif "CIFAR10" in cfg.exp_name:
+        print("CIFAR10")
+        isCIFAR10 = True
+
     best_model_path = file_folder + "/model/model_best.pth"
     # Load pretrain model
     model_name = cfg.model_name
     model = timm.create_model(model_name, pretrained=False, num_classes=10)
-    model.r = 16
+    # model.r = 16
     # Based on pretrained model
     input_size = model.default_cfg["input_size"]
     print(input_size[1:])
@@ -143,19 +153,21 @@ def main(file_folder):
         ]
     )
     # Dataloader(CIFAR10)
-    # testset = torchvision.datasets.CIFAR10(
-    #     root="./data", train=False, download=True, transform=transform_test
-    # )
-    # test_loader = DataLoader(
-    #     testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
-    # )
+    if isCIFAR10:
+        testset = torchvision.datasets.CIFAR10(
+            root="./data", train=False, download=True, transform=transform_test
+        )
+        test_loader = DataLoader(
+            testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
+        )
 
     # Dataloader(ImageNet)
-    data_dir = "./data/imagenet"
-    testset = datasets.ImageFolder(root=f"{data_dir}/val/10", transform=transform_test)
-    test_loader = DataLoader(
-        testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
-    )
+    if isImageNet:
+        data_dir = "./data/imagenet"
+        testset = datasets.ImageFolder(root=f"{data_dir}/val/10", transform=transform_test)
+        test_loader = DataLoader(
+            testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
+        )
 
     # Put model to device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -176,7 +188,7 @@ def main(file_folder):
     )
 
     output_file = file_folder + "/benchmark.txt"
-    with open(output_file, "a") as file:
+    with open(output_file, "w") as file:
         file.write(f"Original\n")
         file.write(f"Throughput: {throughput:.2f} im/s\n")
         file.write(f"Accuracy: {accuracy:.2f}%\n\n")
@@ -205,5 +217,11 @@ if __name__ == "__main__":
     #     file_folder = os.path.join(experiment_dir, folder)
     #     main(file_folder)
 
-    file_folder = "./experiment/ImageNet/deit3_2024_12_18_11_11_55_ViT_ImageNet"
+    # file_folder = "./experiment/deit_2024_12_23_18_45_08_ViT_ImageNet"
+    # main(file_folder)
+    # file_folder = "./experiment/deit_2024_12_23_20_08_15_ViT_CIFAR10"
+    # main(file_folder)
+    file_folder = "./experiment/deit3_2024_12_23_02_38_52_ViT_ImageNet"
+    main(file_folder)
+    file_folder = "./experiment/deit3_2024_12_23_13_55_58_ViT_CIFAR10"
     main(file_folder)
