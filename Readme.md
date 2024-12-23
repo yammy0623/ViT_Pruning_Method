@@ -16,9 +16,9 @@
 
 | Experiment Name               | Original Throughput (im/s) | Original Accuracy | ToMe Throughput (im/s) | ToMe Accuracy | Epochs | Batch Size | Learning Rate |
 |-------------------------------|----------------------------|-------------------|-------------------------|---------------|--------|------------|---------------|
-| efficientnet_b0.ra_in1k       |                     |            | -                       | -             | 200    | 64         | 0.0001        |
-| mixnet_s.ft_in1k              |                     |            | -                       | -             | 200    | 32         | 0.0001        |
-| mobilenetv3_large_100.ra_in1k |                     |            | -                       | -             | 200    | 32         | 0.0001        |
+| efficientnet_b0.ra_in1k       | 10.63                    | 88.80%            | -                       | -             | 200    | 64         | 0.0001        |
+| mixnet_s.ft_in1k              | 117.41                    | 90.52%           | -                       | -             | 200    | 32         | 0.0001        |
+| mobilenetv3_large_100.ra_in1k | 94.74                    | 93.10%          | -                       | -             | 200    | 32         | 0.0001        |
 | deit_tiny_distilled           |                     |            |                   |         | 300    | 64         | 0.0001        |
 | deit3                         |                     |            |                    |          | 200    | 32         | 0.0001        |
 | augreg                        |                     |            |                   |         | 200    | 64         | 0.0001        |

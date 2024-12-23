@@ -1,7 +1,8 @@
 import torch
-import torchvision
+import torchvision 
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
+from torchvision import datasets
 import timm
 import tome
 from tqdm import tqdm
@@ -133,7 +134,6 @@ def main(file_folder):
     input_size = model.default_cfg["input_size"]
     print(input_size[1:])
 
-    # Dataloader
     transform_test = transforms.Compose(
         [
             transforms.Resize(input_size[1:]),
@@ -141,9 +141,17 @@ def main(file_folder):
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
         ]
     )
-    testset = torchvision.datasets.CIFAR10(
-        root="./data", train=False, download=True, transform=transform_test
-    )
+    # Dataloader(CIFAR10)
+    # testset = torchvision.datasets.CIFAR10(
+    #     root="./data", train=False, download=True, transform=transform_test
+    # )
+    # test_loader = DataLoader(
+    #     testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
+    # )
+
+    # Dataloader(ImageNet)
+    data_dir = "./data/imagenet"
+    testset = datasets.ImageFolder(root=f"{data_dir}/val/10", transform=transform_test)
     test_loader = DataLoader(
         testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
     )
@@ -172,7 +180,7 @@ def main(file_folder):
         file.write(f"Throughput: {throughput:.2f} im/s\n")
         file.write(f"Accuracy: {accuracy:.2f}%\n\n")
 
-        if cfg.exp_name != "CNN_based":
+        if cfg.exp_name != "CNN_based_ImageNet":
             print("Apply ToMe")
             tome.patch.timm(model)
             throughput_tome, accuracy_tome = benchmark_with_dataset(
@@ -187,7 +195,7 @@ def main(file_folder):
 
 
 if __name__ == "__main__":
-    # experiment_dir = './experiment'
+    # experiment_dir = './experiment/ImageNet'
     # folders = parse_experiment_folders(experiment_dir)
 
     # for folder in folders:
@@ -195,5 +203,5 @@ if __name__ == "__main__":
     #     file_folder = os.path.join(experiment_dir, folder)
     #     main(file_folder)
 
-    file_folder = "./experiment/EfficientNet_2024_11_19_21_59_13_CNN_based"
+    file_folder = "./experiment/ImageNet/deit3_2024_12_18_11_11_55_ViT_ImageNet"
     main(file_folder)

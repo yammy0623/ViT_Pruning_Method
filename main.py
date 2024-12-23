@@ -4,7 +4,7 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -220,15 +220,16 @@ def train_model(
 
         # Scheduler step
         # scheduler.step()
-        wandb.log(
-            {
-                "epoch": epoch,
-                "train_acc": train_acc,
-                "train_loss": train_loss,
-                "val_acc": val_acc,
-                "val_loss": val_loss,
-            }
-        )
+        if LOG:
+            wandb.log(
+                {
+                    "epoch": epoch,
+                    "train_acc": train_acc,
+                    "train_loss": train_loss,
+                    "val_acc": val_acc,
+                    "val_loss": val_loss,
+                }
+            )
 
         current_result_lists = {
             "train_acc": train_acc_list,
@@ -306,11 +307,22 @@ def write_config(cfg: ModelConfig, config_file_path: str):
 
 def main(cfg):
     print(f"Running experiment {cfg.exp_name} with model {cfg.model_name}")
-    wandb.init(
-        project=cfg.exp_name,
-        config={"learning_rate": cfg.learning_rate, "epoch": cfg.epochs},
-        name=cfg.model_name,
-    )
+    isImageNet = False
+    isCIFAR10 = False
+
+    if "ImageNet" in cfg.exp_name:
+        print("ImageNet")
+        isImageNet = True
+    elif "CIFAR10" in cfg.exp_name:
+        print("CIFAR10")
+        isCIFAR10 = True
+
+    if LOG:
+        wandb.init(
+            project=cfg.exp_name,
+            config={"learning_rate": cfg.learning_rate, "epoch": cfg.epochs},
+            name=cfg.model_name,
+        )
     # Experiment name
     exp_name = (
         cfg.model_type
@@ -323,7 +335,7 @@ def main(cfg):
     logfile_dir = os.path.join("./experiment", exp_name, "log")
     os.makedirs(logfile_dir, exist_ok=True)
     # Write config
-    config_path = os.path.join("./experiment", exp_name, "config.ysaml")
+    config_path = os.path.join("./experiment", exp_name, "config.yaml")
     write_config(cfg, config_path)
     # write_config_log(os.path.join(logfile_dir, 'config_log.txt'))
     model_save_dir = os.path.join("./experiment", exp_name, "model")
@@ -360,26 +372,38 @@ def main(cfg):
     )
 
     # Load CIFAR-10
-    # trainset_full = torchvision.datasets.CIFAR10(
-    #     root="./data", train=True, download=True, transform=transform_train
-    # )
-    # train_size = int(0.7 * len(trainset_full))
-    # val_size = len(trainset_full) - train_size
-    # trainset, valset = random_split(trainset_full, [train_size, val_size])
+    if isCIFAR10:
+        trainset_full = torchvision.datasets.CIFAR10(
+            root="./data", train=True, download=True, transform=transform_train
+        )
+        train_size = int(0.7 * len(trainset_full))
+        val_size = len(trainset_full) - train_size
+        trainset, valset = random_split(trainset_full, [train_size, val_size])
 
-    # testset = torchvision.datasets.CIFAR10(
-    #     root="./data", train=False, download=True, transform=transform_test
-    # )
+        # testset = torchvision.datasets.CIFAR10(
+        #     root="./data", train=False, download=True, transform=transform_test
+        # )
 
+    # TODO Load ImageNet
     # Load ImageNet
-    data_dir = "/data/imagenet"
-    trainset = datasets.ImageNet(root=f"{data_dir}/train", transform=transform_train)
-    valset = datasets.ImageNet(root=f"{data_dir}/val", transform=transform_train)
-    testset = datasets.ImageFolder(root=f"{data_dir}/test", transform=transform_test)
+    if isImageNet:
+        data_dir = "./data/imagenet"
 
-    # 70% training, 30% val
+        # 手動抓前面10個class，trainset作為trainset，valset
+        trainfullset = datasets.ImageFolder(root=f"{data_dir}/train/10", transform=transform_train)
+        # testset 拿valset來用
+        # testset = datasets.ImageFolder(root=f"{data_dir}/val/10", transform=transform_test)
 
-    # DataLoader
+        # DataLoader
+        # 70% training, 30% val
+        train_loader = DataLoader(
+            trainfullset, batch_size=cfg.batch_size, shuffle=True, num_workers=4
+        )
+        # Split trainset into training and validation sets
+        train_size = int(0.7 * len(trainfullset))
+        val_size = len(trainfullset) - train_size
+        trainset, valset= random_split(trainfullset, [train_size, val_size])
+
     train_loader = DataLoader(
         trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=4
     )
@@ -387,14 +411,15 @@ def main(cfg):
         valset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
     )
 
-    test_loader = DataLoader(
-        testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
-    )
+    # testloader
+    # test_loader = DataLoader(
+    #     testset, batch_size=cfg.batch_size, shuffle=False, num_workers=4
+    # )
 
     # OPTIMIZER
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
-    milestones = [16, 32, 45]
+    # milestones = [16, 32, 45]
     # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.1)
 
     # TRAIN
@@ -409,10 +434,12 @@ def main(cfg):
         model_save_dir,
         logfile_dir,
     )
-    test_model(device, model, test_loader)
-    wandb.finish()
+    # test_model(device, model, test_loader)
 
+    if LOG:
+        wandb.finish()
 
+LOG = True
 if __name__ == "__main__":
     with open("config.yaml", "r") as file:
         configs = yaml.safe_load(file)
@@ -420,6 +447,7 @@ if __name__ == "__main__":
     for model_cfg in configs["models"]:
         cfg = ModelConfig(**model_cfg)
         main(cfg)
+    
 
     # cfg = ModelConfig(
     #     exp_name = "cait",

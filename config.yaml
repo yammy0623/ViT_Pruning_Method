@@ -1,48 +1,72 @@
 models:
-  - exp_name: "CNN_based"
-    model_type: "MobileNetV3"
-    model_name: "mobilenetv3_large_100.ra_in1k"
+  # - exp_name: "CNN_based_ImageNet"
+  #   model_type: "MobileNetV3"
+  #   model_name: "mobilenetv3_large_100.ra_in1k"
+  #   runs: 50
+  #   epochs: 200
+  #   batch_size: 32
+  #   learning_rate: 0.0001
+
+  # - exp_name: "CNN_based_ImageNet"
+  #   model_type: "EfficientNet"
+  #   model_name: "efficientnet_b0.ra_in1k"
+  #   runs: 50
+  #   epochs: 200
+  #   batch_size: 64
+  #   learning_rate: 0.0001
+
+  # - exp_name: "CNN_based_ImageNet"
+  #   model_type: "MixNet"
+  #   model_name: "mixnet_s.ft_in1k"
+  #   runs: 50
+  #   epochs: 200
+  #   batch_size: 32
+  #   learning_rate: 0.0001
+
+  # - exp_name: "ViT_ImageNet"
+  #   model_type: "cait"
+  #   model_name: "cait_xxs24_224.fb_dist_in1k"
+  #   runs: 50
+  #   epochs: 200
+  #   batch_size: 32
+  #   learning_rate: 0.0001
+
+  # - exp_name: "ViT_ImageNet"
+  #   model_type: "augreg"
+  #   model_name: "vit_small_patch32_224.augreg_in21k_ft_in1k"
+  #   runs: 50
+  #   epochs: 200
+  #   batch_size: 64
+  #   learning_rate: 0.0001
+
+  # - exp_name: "ViT_ImageNet"
+  #   model_type: "deit3"
+  #   model_name: "deit3_small_patch16_224.fb_in22k_ft_in1k"
+  #   runs: 50
+  #   epochs: 200
+  #   batch_size: 32
+  #   learning_rate: 0.0001
+
+  - exp_name: "ViT_CIFAR10"
+    model_type: "deit3"
+    model_name: "deit3_small_patch16_224.fb_in22k_ft_in1k"
     runs: 50
     epochs: 200
     batch_size: 32
     learning_rate: 0.0001
 
-  - exp_name: "CNN_based"
-    model_type: "EfficientNet"
-    model_name: "efficientnet_b0.ra_in1k"
+  - exp_name: "ViT_ImageNet"
+    model_type: deit
+    model_name: deit_tiny_distilled_patch16_224.fb_in1k
     runs: 50
-    epochs: 200
+    epochs: 300
     batch_size: 64
     learning_rate: 0.0001
 
-  - exp_name: "CNN_based"
-    model_type: "MixNet"
-    model_name: "mixnet_s.ft_in1k"
+  - exp_name: "ViT_CIFAR10"
+    model_type: deit
+    model_name: deit_tiny_distilled_patch16_224.fb_in1k
     runs: 50
-    epochs: 200
-    batch_size: 32
+    epochs: 300
+    batch_size: 64
     learning_rate: 0.0001
-
-#   - exp_name: "cait"
-#     model_type: "cait"
-#     model_name: "cait_xxs24_224.fb_dist_in1k"
-#     runs: 50
-#     epochs: 200
-#     batch_size: 32
-#     learning_rate: 1e-4
-
-#   - exp_name: "augreg"
-#     model_type: "augreg"
-#     model_name: "vit_small_patch32_224.augreg_in21k_ft_in1k"
-#     runs: 50
-#     epochs: 200
-#     batch_size: 64
-#     learning_rate: 1e-4
-
-#   - exp_name: "deit3"
-#     model_type: "deit3"
-#     model_name: "deit3_small_patch16_384.fb_in22k_ft_in1k"
-#     runs: 50
-#     epochs: 200
-#     batch_size: 32
-#     learning_rate: 1e-4
